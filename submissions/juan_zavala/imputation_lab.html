@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Rushing Yards Imputation Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a game-day scoreboard. The verdict sits on top, one control row sets the week and
+   metric, and the evidence (games, season, columns, fairness) stacks underneath. */
+:root {
+  --bg: #f2f4f0;
+  --surface: #fcfcfb;
+  --surface-2: #eceee9;
+  --ink: #111412;
+  --ink-2: #4a504b;
+  --muted: #5f655f;
+  --rule: #d9ddd5;
+  --grid: #e4e7e1;
+  --focus: #1c5cab;
+  --chip-on-bg: #111412;
+  --chip-on-ink: #fcfcfb;
+  --m-model: #2a78d6;
+  --m-mean: #eb6834;
+  --m-team: #1baf7a;
+  --ok: #006300;
+  --font-display: "Saira Condensed", "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
+  --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d100e; --surface: #1a1a19; --surface-2: #242522; --ink: #f2f4f0; --ink-2: #c3c2b7; --muted: #a3a79f;
+    --rule: #30312e; --grid: #2a2b28; --focus: #6da7ec; --chip-on-bg: #f2f4f0; --chip-on-ink: #111412;
+    --m-model: #3987e5; --m-mean: #d95926; --m-team: #199e70; --ok: #3fbf3f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d100e; --surface: #1a1a19; --surface-2: #242522; --ink: #f2f4f0; --ink-2: #c3c2b7; --muted: #a3a79f;
+  --rule: #30312e; --grid: #2a2b28; --focus: #6da7ec; --chip-on-bg: #f2f4f0; --chip-on-ink: #111412;
+  --m-model: #3987e5; --m-mean: #d95926; --m-team: #199e70; --ok: #3fbf3f;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-ui); font-size: 15px; line-height: 1.5; }
+.page { max-width: 1200px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 56px; display: grid; gap: 20px; }
+@media (max-width: 520px) { .page { padding-inline: 16px; padding-block: 20px 40px; } }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+p { margin: 0; }
+button, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.num { font-variant-numeric: tabular-nums; }
+
+.masthead { display: grid; gap: 10px; max-width: 80ch; }
+.masthead h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(38px, 6.5vw, 60px); line-height: .95; letter-spacing: .01em; text-transform: uppercase; }
+.lede { color: var(--ink-2); font-size: 16.5px; max-width: 68ch; }
+.byline { font-size: 13px; color: var(--muted); }
+
+/* Verdict */
+.verdict { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 18px; display: grid; gap: 16px; }
+.verdict-head { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: flex-end; justify-content: space-between; }
+.headline { font-family: var(--font-display); font-weight: 700; font-size: clamp(26px, 4vw, 38px); line-height: 1.05; max-width: 30ch; }
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 760px) { .cards { grid-template-columns: minmax(0, 1fr); } }
+.card { border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; min-width: 0; background: var(--surface); }
+.card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.method-name { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
+.key { display: inline-block; width: 12px; height: 12px; border-radius: 50%; flex: none; }
+.rank { font-family: var(--font-display); font-weight: 700; font-size: 15px; letter-spacing: .04em; border: 1px solid var(--rule); border-radius: 6px; padding: 0 8px; color: var(--ink-2); }
+.rank.first { background: var(--chip-on-bg); color: var(--chip-on-ink); border-color: var(--chip-on-bg); }
+.big { font-size: 40px; font-weight: 700; line-height: 1.05; letter-spacing: -.01em; }
+.big small { font-size: 15px; font-weight: 500; color: var(--ink-2); margin-left: 4px; letter-spacing: 0; }
+.sub { font-size: 13px; color: var(--muted); }
+.badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; border-radius: 999px; padding: 3px 10px 3px 8px; width: max-content; max-width: 100%; border: 1px solid currentColor; color: var(--ok); }
+.badge svg { width: 14px; height: 14px; flex: none; }
+
+/* Controls */
+.controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 12px 16px; }
+.control { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.control > span { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 8px; padding: 3px; gap: 3px; background: var(--surface-2); flex-wrap: wrap; }
+.seg button { border: 0; background: transparent; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13.5px; color: var(--ink-2); min-width: 32px; }
+.seg button[aria-pressed="true"] { background: var(--chip-on-bg); color: var(--chip-on-ink); }
+.weeks button.missing { box-shadow: inset 0 -3px 0 var(--m-model); }
+#model-seg { display: inline-flex; flex-wrap: nowrap; flex: none; }
+
+/* Panels */
+.grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 1000px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 16px; display: grid; gap: 12px; align-content: start; min-width: 0; }
+.panel-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; flex-wrap: wrap; }
+.panel-head > div { display: grid; gap: 3px; min-width: 0; max-width: 64ch; }
+.panel h2 { font-family: var(--font-display); font-weight: 700; font-size: 26px; letter-spacing: .01em; line-height: 1.05; }
+.caption { font-size: 13px; color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.legend i.diamond { width: 9px; height: 9px; border-radius: 1px; transform: rotate(45deg); background: var(--ink); }
+.legend i.line { width: 14px; height: 3px; border-radius: 2px; }
+.week-scores { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--rule); border-radius: 999px; padding: 3px 10px; font-size: 13px; color: var(--ink-2); }
+.pill strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+.pill.win { border-color: var(--ink); }
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.hit { cursor: pointer; }
+.link-btn { border: 1px solid var(--rule); background: var(--surface); border-radius: 7px; padding: 5px 10px; font-size: 13px; cursor: pointer; color: var(--ink-2); }
+.table-scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+th { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+td.wrap { white-space: normal; min-width: 16ch; }
+.verdict-cell { font-weight: 600; }
+.tip { position: fixed; z-index: 10; pointer-events: none; background: var(--surface); color: var(--ink); border: 1px solid var(--rule); border-radius: 8px; padding: 8px 10px; font-size: 13px; line-height: 1.45; box-shadow: 0 6px 20px rgba(0,0,0,.14); max-width: 300px; }
+.tip strong { display: block; font-size: 14px; }
+.tip .row { display: flex; align-items: center; gap: 6px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.tip .k { display: inline-block; width: 12px; height: 3px; border-radius: 2px; flex: none; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.facts .panel p, .facts li { color: var(--ink-2); font-size: 14px; }
+.facts h3 { font-family: var(--font-display); font-weight: 700; font-size: 21px; }
+.facts ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 14px; max-width: 92ch; }
+</style>
+</head>
+<body>
+
+
+<div class="page">
+  <header class="masthead">
+    <p class="eyebrow">AI for Analytics · Handling missing values · 272 games, one row per winning team</p>
+    <h1>Rushing Yards Imputation Lab</h1>
+    <p class="lede">Week 12's rushing totals were missing for all 16 games. Three methods filled them in: the overall average, each team's average, and a ridge regression model. Here is how each one scored against the real answers, and how they compare on every other week of the season.</p>
+    <p class="byline">Juan Zavala · built with Claude as a pair programmer</p>
+  </header>
+
+  <section class="verdict" aria-label="Week 12 results">
+    <div class="verdict-head">
+      <p class="headline" id="headline"></p>
+      <span class="badge" id="match-badge"></span>
+    </div>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <section class="controls" aria-label="Choose a week and a metric">
+    <div class="control">
+      <span>Metric</span>
+      <div class="seg" role="group" aria-label="Error metric" id="metric-seg">
+        <button type="button" data-metric="mae">MAE</button>
+        <button type="button" data-metric="mse">MSE</button>
+        <button type="button" data-metric="rmse">RMSE</button>
+      </div>
+    </div>
+    <div class="control">
+      <span>Week</span>
+      <div class="seg weeks" role="group" aria-label="Week" id="week-seg"></div>
+    </div>
+  </section>
+
+  <section class="grid2">
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h2 id="games-title">Week 12, game by game</h2>
+          <p class="caption" id="games-caption"></p>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i class="diamond"></i>Actual</span>
+        <span><i style="background: var(--m-model)"></i>Model</span>
+        <span><i style="background: var(--m-team)"></i>Team mean</span>
+        <span><i style="background: var(--m-mean)"></i>Overall mean</span>
+      </div>
+      <div class="week-scores" id="week-scores"></div>
+      <div class="chart" id="games-chart"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Every week, scored the same way</h2>
+          <p class="caption" id="season-caption"></p>
+        </div>
+        <button type="button" class="link-btn" id="season-toggle" aria-pressed="false">Show table</button>
+      </div>
+      <div class="legend">
+        <span><i class="line" style="background: var(--m-model)"></i>Model</span>
+        <span><i class="line" style="background: var(--m-team)"></i>Team mean</span>
+        <span><i class="line" style="background: var(--m-mean)"></i>Overall mean</span>
+      </div>
+      <div class="week-scores" id="wins"></div>
+      <div class="chart" id="season-chart"></div>
+      <div class="table-scroll" id="season-table" hidden></div>
+    </div>
+  </section>
+
+  <section class="grid2">
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Does every column earn its place?</h2>
+          <p class="caption">Average error per hidden week for each set of columns (leave-one-week-out, known rows only). Lower is better; the scale starts at 30 yards. The four columns the assignment chose are in blue; “noise” means 10 extra columns of random numbers.</p>
+        </div>
+        <div class="seg" role="group" aria-label="Model type" id="model-seg">
+          <button type="button" data-model="ridge">Ridge</button>
+          <button type="button" data-model="linear">Linear</button>
+        </div>
+      </div>
+      <div class="chart" id="feature-chart"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Claude's column predictions, checked</h2>
+          <p class="caption">Written down before the column test was run, then scored against it.</p>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Prediction</th><th>What the test showed</th><th>Verdict</th></tr></thead>
+          <tbody>
+            <tr><td class="wrap"><code>tm_score</code> helps most</td><td class="wrap">Best single column (ridge 36.10)</td><td class="verdict-cell">Right</td></tr>
+            <tr><td class="wrap"><code>pass_yds</code> also helps</td><td class="wrap">With <code>tm_score</code>: 34.23</td><td class="verdict-cell">Right</td></tr>
+            <tr><td class="wrap"><code>opp_score</code> helps alongside <code>tm_score</code></td><td class="wrap">36.36, no better than <code>tm_score</code> alone (36.10)</td><td class="verdict-cell">Wrong</td></tr>
+            <tr><td class="wrap">Team columns add little and hurt plain linear regression</td><td class="wrap">Ridge 34.23 → 34.06; linear 34.25 → 36.23</td><td class="verdict-cell">Right</td></tr>
+            <tr><td class="wrap">Extra columns make it worse</td><td class="wrap">Week and noise hurt; <code>opp_name</code> made no real difference with ridge</td><td class="verdict-cell">Mostly right</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="fair-title">
+    <div class="panel-head">
+      <div>
+        <h2 id="fair-title">How we know the test was fair</h2>
+        <p class="caption">The expected errors were committed to git (commit 87957e3) before any code read the answer key. Here they are next to what actually happened.</p>
+      </div>
+    </div>
+    <div class="table-scroll"><table id="prereg-table"></table></div>
+  </section>
+
+  <section class="facts" aria-label="Checks">
+    <div class="panel">
+      <h3>Lined up by key, not by order</h3>
+      <p id="align-text"></p>
+    </div>
+    <div class="panel">
+      <h3>Only 16 games: how sure are we?</h3>
+      <ul id="h2h-list"></ul>
+    </div>
+    <div class="panel">
+      <h3>Why every method guessed low</h3>
+      <p>Week 12 averaged 141.6 rushing yards, the 5th-highest of 18 weeks but inside the normal range (other weeks: 102.8 to 149.0, p = 0.31). It was a heavy rushing week by chance, so all three methods came in low on average.</p>
+    </div>
+  </section>
+
+  <footer>Data: the class's <span class="num">season_stats.csv</span> (272 games, 16 missing <span class="num">rush_yds</span> values, all in week 12) and <span class="num">actual.csv</span> (the answer key). For weeks other than 12, the predictions come from the hidden-week test: each week was predicted from the other 16 known weeks. This page's scoring engine reproduces the notebook's numbers exactly (117 checks, 0 mismatches). Analysis: <span class="num">rushing_yards_imputation.ipynb</span> in Juan's GitHub submission. Built with Claude as a pair programmer.</footer>
+</div>
+
+<div class="tip" id="tip" hidden></div>
+
+<script type="application/json" id="dataset">{"games":[[12,18,"Cowboys","Football Team",38,10,309,131,126.6625,118.8,132.46707072301206],[13,18,"Rams","49ers",21,20,163,109,126.6625,133.875,134.03904779904124],[14,18,"Chiefs","Chargers",13,12,154,123,126.6625,106.33333333333333,113.00738411741884],[15,18,"Raiders","Broncos",27,14,244,129,126.6625,113.57142857142857,121.70101563678976],[16,18,"Titans","Jaguars",28,20,168,175,126.6625,136.5,146.9342433718364],[17,18,"Giants","Eagles",27,10,311,109,126.6625,133.25,113.90862474204093],[18,18,"Jets","Patriots",17,3,70,185,126.6625,132.66666666666666,143.9111842808228],[19,18,"Saints","Falcons",48,17,264,154,126.6625,109.875,164.5078815659053],[20,18,"Bills","Dolphins",21,14,359,128,126.6625,144.4,90.85850122773778],[21,18,"Packers","Bears",17,9,316,124,126.6625,134.42857142857142,91.27136063383445],[22,18,"Lions","Vikings",30,20,320,70,126.6625,150.0,122.16740888969358],[23,18,"Seahawks","Cardinals",21,20,189,138,126.6625,107.0,121.44980008270309],[24,18,"Bengals","Browns",31,14,176,183,126.6625,92.625,144.4266408468152],[25,18,"Buccaneers","Panthers",9,0,137,113,126.6625,103.625,106.14830924909182],[26,18,"Steelers","Ravens",17,10,152,155,126.6625,127.375,124.87498022684852],[27,18,"Texans","Colts",23,19,264,60,126.6625,116.11111111111111,113.46710021903083],[28,17,"49ers","Football Team",27,10,230,184,125.78333333333333,150.4,135.02884721569959],[29,17,"Saints","Buccaneers",23,13,208,108,125.78333333333333,115.625,121.85491772795355],[30,17,"Steelers","Seahawks",30,23,274,202,125.78333333333333,121.5,123.59312638034902],[31,17,"Ravens","Dolphins",56,19,340,160,125.78333333333333,161.9090909090909,173.7056035306535],[32,17,"Cardinals","Eagles",35,31,232,221,125.78333333333333,164.66666666666666,146.69449916332258],[33,17,"Rams","Giants",26,25,317,105,125.78333333333333,134.375,109.46538112732347],[34,17,"Packers","Vikings",33,10,293,177,125.78333333333333,126.85714285714286,130.90000280049978],[35,17,"Chiefs","Bengals",25,17,245,132,125.78333333333333,105.33333333333333,119.12640625626953],[36,17,"Jaguars","Panthers",26,0,178,155,125.78333333333333,119.71428571428571,138.65690403554004],[37,17,"Texans","Titans",26,3,213,111,125.78333333333333,110.44444444444444,132.24107014089134],[38,17,"Broncos","Chargers",16,9,224,101,125.78333333333333,111.5,104.79768201159716],[39,17,"Colts","Raiders",23,20,224,134,125.78333333333333,118.71428571428571,119.70049787056965],[40,17,"Bears","Falcons",37,17,268,192,125.78333333333333,175.2,147.8853116351828],[41,17,"Bills","Patriots",27,21,169,127,125.78333333333333,144.5,146.17899872846618],[42,17,"Cowboys","Lions",20,19,345,61,125.78333333333333,125.8,84.89356693838874],[43,17,"Browns","Jets",37,20,309,127,125.78333333333333,114.6,129.40757546821612],[44,16,"Ravens","49ers",33,19,252,102,126.9875,167.1818181818182,146.13008478973467],[45,16,"Eagles","Giants",33,25,301,170,126.9875,133.44444444444446,127.98614860364601],[46,16,"Raiders","Chiefs",20,14,62,157,126.9875,109.57142857142857,145.08526259760652],[47,16,"Buccaneers","Jaguars",30,12,283,70,126.9875,109.0,123.0119783776972],[48,16,"Seahawks","Titans",20,17,227,58,126.9875,117.0,114.04503792586127],[49,16,"Jets","Football Team",30,28,217,164,126.9875,136.16666666666666,139.09154311845955],[50,16,"Lions","Vikings",30,24,257,143,126.9875,143.36363636363637,133.9189832798547],[51,16,"Dolphins","Cowboys",22,20,293,91,126.9875,147.33333333333334,109.59721252723546],[52,16,"Browns","Texans",36,22,374,54,126.9875,121.9,117.04512071154069],[53,16,"Patriots","Broncos",26,23,256,59,126.9875,111.33333333333333,121.06922564476346],[54,16,"Bears","Cardinals",27,16,170,250,126.9875,163.6,146.5527284996502],[55,16,"Packers","Panthers",33,30,219,162,126.9875,129.0,146.03729041046006],[56,16,"Falcons","Colts",29,10,229,177,126.9875,136.6,138.38935638789036],[57,16,"Bills","Chargers",24,22,237,105,126.9875,146.7,125.53619231249372],[58,16,"Steelers","Bengals",34,11,290,113,126.9875,132.625,134.81211562600012],[59,16,"Rams","Saints",30,22,328,133,126.9875,130.875,117.39456049872915],[60,15,"Seahawks","Eagles",20,17,208,100,126.4875,111.75,115.01173218940053],[61,15,"Rams","Football Team",28,20,258,196,126.4875,123.0,126.19683507396627],[62,15,"Texans","Titans",19,16,229,148,126.4875,106.33333333333333,108.67815969719867],[63,15,"Chiefs","Patriots",27,17,309,43,126.4875,115.22222222222223,113.54072479143736],[64,15,"Saints","Giants",24,6,218,87,126.4875,118.25,122.74468441752683],[65,15,"Dolphins","Jets",30,0,228,77,126.4875,148.88888888888889,143.66845295817143],[66,15,"Ravens","Jaguars",23,7,171,251,126.4875,153.63636363636363,136.99463846938153],[67,15,"Buccaneers","Packers",34,20,381,99,126.4875,105.375,111.14765674722612],[68,15,"49ers","Cardinals",45,29,262,144,126.4875,154.4,169.25136282626096],[69,15,"Browns","Bears",20,17,379,29,126.4875,124.4,81.7244391728017],[70,15,"Panthers","Falcons",9,7,167,129,126.4875,44.0,99.55497470429393],[71,15,"Bills","Cowboys",31,10,94,266,126.4875,130.6,167.45137080224663],[72,15,"Lions","Broncos",42,17,278,185,126.4875,139.54545454545453,157.86900633838343],[73,15,"Colts","Steelers",30,13,215,170,126.4875,113.57142857142857,137.6876544291939],[74,15,"Bengals","Vikings",27,24,324,80,126.4875,105.5,105.54621518159789],[75,15,"Raiders","Chargers",63,21,260,124,126.4875,114.28571428571429,203.78758430177913],[76,14,"Giants","Packers",24,22,158,209,127.16597510373444,108.25,137.86862711473748],[77,14,"Titans","Dolphins",28,27,327,83,127.16597510373444,159.5,112.9204854708736],[78,14,"49ers","Seahawks",28,16,368,173,127.16597510373444,151.5,105.69266886369617],[79,14,"Broncos","Chargers",24,7,224,106,127.16597510373444,110.66666666666667,123.20163299293651],[80,14,"Ravens","Rams",37,31,316,139,127.16597510373444,163.8181818181818,138.16446325301936],[81,14,"Vikings","Raiders",3,0,146,132,127.16597510373444,98.0,93.14615213697668],[82,14,"Jets","Texans",30,6,301,79,127.16597510373444,150.33333333333334,126.34660123484349],[83,14,"Saints","Panthers",28,6,119,97,127.16597510373444,117.0,155.7985225097851],[84,14,"Bills","Chiefs",20,17,233,118,127.16597510373444,145.4,117.03656246635109],[85,14,"Cowboys","Eagles",33,13,271,138,127.16597510373444,118.1,130.07132104440802],[86,14,"Browns","Jaguars",31,27,311,82,127.16597510373444,119.1,117.21273491123023],[87,14,"Bengals","Colts",34,14,274,111,127.16597510373444,101.625,132.4285083776141],[88,14,"Bears","Lions",28,13,223,142,127.16597510373444,185.2,141.77717446186477],[89,14,"Buccaneers","Falcons",29,25,144,148,127.16597510373444,99.25,148.21793039854276],[90,14,"Patriots","Steelers",21,18,240,81,127.16597510373444,104.0,112.63586143170795],[91,13,"Bengals","Jaguars",34,31,347,156,127.53909465020575,96.0,108.02082411977001],[92,13,"Dolphins","Football Team",45,15,283,123,127.53909465020575,143.77777777777777,165.60709325440732],[93,13,"Buccaneers","Panthers",21,18,202,128,127.53909465020575,101.75,117.01955379172759],[94,13,"Rams","Browns",36,19,279,120,127.53909465020575,132.5,143.70982446418026],[95,13,"Cardinals","Steelers",24,10,145,150,127.53909465020575,188.33333333333334,153.75504423801556],[96,13,"49ers","Eagles",42,19,314,146,127.53909465020575,154.2,152.58190491458126],[97,13,"Colts","Titans",31,28,312,55,127.53909465020575,130.0,119.04774990503256],[98,13,"Falcons","Jets",13,8,121,90,127.53909465020575,154.0,134.70971815682512],[99,13,"Chargers","Patriots",6,0,212,29,127.53909465020575,80.75,82.04395293777432],[100,13,"Lions","Saints",33,28,213,142,127.53909465020575,143.45454545454547,152.63308498557444],[101,13,"Texans","Broncos",22,17,292,89,127.53909465020575,112.88888888888889,103.8811663498288],[102,13,"Packers","Chiefs",27,19,267,129,127.53909465020575,133.71428571428572,126.11771622829504],[103,13,"Cowboys","Seahawks",41,35,299,136,127.53909465020575,118.3,136.51809334143124],[104,12,"Bears","Vikings",12,10,217,118,127.0,178.0,108.0],[105,12,"Ravens","Chargers",20,10,177,197,127.0,162.0,134.0],[106,12,"Chiefs","Raiders",31,17,298,69,127.0,108.0,121.0],[107,12,"Eagles","Bills",37,34,200,185,127.0,137.0,159.0],[108,12,"Titans","Panthers",17,10,185,80,127.0,144.0,122.0],[109,12,"Giants","Patriots",10,7,191,58,127.0,128.0,104.0],[110,12,"Jaguars","Texans",24,21,364,81,127.0,124.0,91.0],[111,12,"Broncos","Browns",29,12,134,169,127.0,110.0,153.0],[112,12,"Rams","Cardinals",37,14,229,228,127.0,131.0,155.0],[113,12,"Colts","Buccaneers",27,20,251,155,127.0,121.0,124.0],[114,12,"Steelers","Bengals",16,10,278,153,127.0,130.0,97.0],[115,12,"Falcons","Saints",24,15,168,228,127.0,143.0,142.0],[116,12,"Dolphins","Jets",34,13,243,167,127.0,142.0,146.0],[117,12,"49ers","Seahawks",31,13,209,169,127.0,153.0,150.0],[118,12,"Packers","Lions",29,22,268,109,127.0,133.0,129.0],[119,12,"Cowboys","Football Team",45,10,331,100,127.0,120.0,143.0],[120,11,"Eagles","Chiefs",21,17,150,114,128.06611570247935,139.66666666666666,139.25517919174052],[121,11,"Giants","Football Team",31,19,246,91,128.06611570247935,137.75,138.9032643325822],[122,11,"49ers","Buccaneers",27,14,333,115,128.06611570247935,157.3,113.42479117939793],[123,11,"Rams","Seahawks",17,16,190,82,128.06611570247935,137.25,122.41299846579683],[124,11,"Dolphins","Raiders",20,13,325,99,128.06611570247935,146.44444444444446,97.74112681519046],[125,11,"Jaguars","Titans",34,14,262,128,128.06611570247935,123.57142857142857,137.22625227180862],[126,11,"Texans","Cardinals",21,16,338,111,128.06611570247935,110.44444444444444,91.38506546166431],[127,11,"Packers","Chargers",23,20,322,102,128.06611570247935,137.57142857142858,104.22373323114532],[128,11,"Lions","Bears",31,26,236,115,128.06611570247935,145.9090909090909,142.62568401983],[129,11,"Broncos","Vikings",21,20,259,46,128.06611570247935,120.66666666666667,109.3932568535104],[130,11,"Browns","Steelers",13,10,165,96,128.06611570247935,117.7,113.32458390520358],[131,11,"Cowboys","Panthers",33,10,204,107,128.06611570247935,121.2,146.90931678842153],[132,11,"Bills","Jets",32,6,275,130,128.06611570247935,144.2,135.69000301571128],[133,11,"Ravens","Bengals",34,20,264,157,128.06611570247935,162.1818181818182,144.5406952084329],[134,10,"Broncos","Bills",24,22,193,122,125.97107438016529,108.0,124.84759092421785],[135,10,"Buccaneers","Titans",20,6,278,77,125.97107438016529,108.125,100.39375306296864],[136,10,"Seahawks","Football Team",29,26,369,120,125.97107438016529,109.25,92.21879584777304],[137,10,"Lions","Chargers",41,38,333,200,125.97107438016529,138.1818181818182,132.82786210249617],[138,10,"Browns","Ravens",33,31,213,178,125.97107438016529,109.5,136.48676724877646],[139,10,"Raiders","Jets",16,12,153,148,125.97107438016529,110.85714285714286,116.61959436271069],[140,10,"Steelers","Packers",23,19,126,205,125.97107438016529,121.125,143.55167911338523],[141,10,"Colts","Patriots",10,6,194,70,125.97107438016529,127.85714285714286,103.17538821988549],[142,10,"Vikings","Saints",27,19,268,125,125.97107438016529,99.16666666666667,114.85058008173911],[143,10,"49ers","Jaguars",34,3,302,144,125.97107438016529,154.4,139.9895230896148],[144,10,"Cowboys","Giants",49,17,472,168,125.97107438016529,115.1,111.44807580099396],[145,10,"Cardinals","Falcons",25,23,249,122,125.97107438016529,197.66666666666666,126.73361840453353],[146,10,"Texans","Bengals",30,27,356,188,125.97107438016529,101.88888888888889,97.72322714119008],[147,10,"Bears","Panthers",16,13,162,133,125.97107438016529,187.0,132.6490123335083],[148,9,"Chargers","Jets",27,6,136,84,127.15289256198348,67.0,145.75789821661903],[149,9,"Ravens","Seahawks",37,3,225,298,127.15289256198348,149.36363636363637,154.95701758688028],[150,9,"Raiders","Giants",30,6,209,125,127.15289256198348,114.14285714285714,136.23861867019082],[151,9,"Eagles","Cowboys",28,23,207,109,127.15289256198348,140.22222222222223,141.35576617877814],[152,9,"Football Team","Patriots",20,17,325,124,127.15289256198348,95.33333333333333,89.73005433662676],[153,9,"Saints","Bears",24,17,214,87,127.15289256198348,118.25,124.37357684319117],[154,9,"Chiefs","Dolphins",21,14,185,93,127.15289256198348,109.66666666666667,126.82830564639774],[155,9,"Texans","Buccaneers",39,37,470,53,127.15289256198348,116.88888888888889,102.7596230134728],[156,9,"Packers","Rams",20,3,228,184,127.15289256198348,125.85714285714286,116.00936980427525],[157,9,"Browns","Cardinals",27,0,219,113,127.15289256198348,116.0,128.5817417544825],[158,9,"Bengals","Bills",24,18,348,54,127.15289256198348,108.75,93.2573759297531],[159,9,"Colts","Panthers",27,13,127,78,127.15289256198348,126.71428571428571,154.7494772213882],[160,9,"Vikings","Falcons",31,28,236,146,127.15289256198348,95.66666666666667,135.49777764964097],[161,9,"Steelers","Titans",20,16,160,166,127.15289256198348,126.0,131.4670159846777],[162,8,"Lions","Raiders",26,14,272,222,128.1,136.1818181818182,121.08137766161248],[163,8,"Eagles","Football Team",38,31,319,59,128.1,145.77777777777777,139.72737844173147],[164,8,"Bengals","49ers",31,17,283,134,128.1,98.75,120.44835610109494],[165,8,"Seahawks","Browns",24,20,254,114,128.1,110.0,113.85833069059491],[166,8,"Chargers","Bears",30,13,298,54,128.1,74.5,114.1341323764404],[167,8,"Jaguars","Steelers",20,10,292,106,128.1,126.71428571428571,98.22778310182045],[168,8,"Titans","Falcons",28,23,238,149,128.1,143.0,133.9015371714752],[169,8,"Jets","Giants",13,10,240,58,128.1,153.83333333333334,102.32583993343108],[170,8,"Dolphins","Patriots",31,17,324,78,128.1,148.77777777777777,124.45621728936727],[171,8,"Vikings","Packers",24,10,297,62,128.1,109.66666666666667,107.13424453776992],[172,8,"Broncos","Chiefs",24,9,114,153,128.1,102.83333333333333,146.27045552485873],[173,8,"Cowboys","Rams",43,20,307,102,128.1,121.7,144.02273188366945],[174,8,"Ravens","Cardinals",31,24,157,130,128.1,164.63636363636363,166.43875927919532],[175,8,"Saints","Colts",38,27,354,161,128.1,109.0,117.74490613293888],[176,8,"Panthers","Texans",15,13,235,44,128.1,129.0,104.5184106044897],[177,8,"Bills","Buccaneers",24,18,324,115,128.1,145.7,106.44641701996909],[178,7,"Vikings","49ers",22,17,378,74,127.39917695473251,107.66666666666667,83.49711684445285],[179,7,"Falcons","Buccaneers",16,13,250,156,127.39917695473251,140.8,104.22709552855977],[180,7,"Seahawks","Cardinals",20,10,219,115,127.39917695473251,109.875,114.20904758137645],[181,7,"Ravens","Lions",38,6,357,146,127.39917695473251,163.1818181818182,133.22536540349702],[182,7,"Steelers","Rams",24,17,230,86,127.39917695473251,136.0,125.6316328852352],[183,7,"Eagles","Dolphins",31,17,279,99,127.39917695473251,141.33333333333334,131.06542706001744],[184,7,"Giants","Football Team",14,7,279,106,127.39917695473251,134.0,91.89855014455387],[185,7,"Patriots","Bills",29,25,272,96,127.39917695473251,99.0,123.14845074203556],[186,7,"Chiefs","Chargers",31,17,424,68,127.39917695473251,112.44444444444444,94.40564918889427],[187,7,"Broncos","Packers",19,17,194,145,127.39917695473251,104.16666666666667,116.02579533012967],[188,7,"Browns","Colts",39,38,183,150,127.39917695473251,112.3,163.45030198617957],[189,7,"Bears","Raiders",30,12,162,173,127.39917695473251,179.0,159.0820853300824],[190,7,"Jaguars","Saints",31,24,217,113,127.39917695473251,125.71428571428571,140.6556380742079],[191,6,"Cowboys","Chargers",20,17,272,96,128.3941908713693,122.3,102.0960837015137],[192,6,"Lions","Buccaneers",20,6,353,40,128.3941908713693,152.72727272727272,94.41213972825989],[193,6,"Rams","Cardinals",26,9,226,179,128.3941908713693,125.125,131.94833235078147],[194,6,"Raiders","Patriots",21,17,264,84,128.3941908713693,120.0,106.10352759853606],[195,6,"Ravens","Titans",24,16,223,139,128.3941908713693,163.8181818181818,133.2367949958397],[196,6,"Jets","Eagles",20,14,186,89,128.3941908713693,148.66666666666666,129.99246686344614],[197,6,"Dolphins","Panthers",42,21,262,162,128.3941908713693,139.44444444444446,159.1378173511988],[198,6,"Jaguars","Colts",37,20,181,85,128.3941908713693,129.71428571428572,164.2990810705267],[199,6,"Texans","Saints",20,13,199,120,128.3941908713693,109.44444444444444,122.69755960749862],[200,6,"Browns","49ers",19,17,192,160,128.3941908713693,111.3,118.37163065335359],[201,6,"Bengals","Seahawks",17,13,185,46,128.3941908713693,109.75,117.97275990318795],[202,6,"Vikings","Bears",19,13,181,46,128.3941908713693,112.33333333333333,125.3638975871919],[203,6,"Bills","Giants",14,9,169,128,128.3941908713693,144.4,121.5623395325865],[204,6,"Football Team","Falcons",24,16,151,72,128.3941908713693,112.66666666666667,143.18382001866206],[205,6,"Chiefs","Broncos",19,8,306,96,128.3941908713693,109.33333333333333,95.05518602400495],[206,5,"Raiders","Packers",17,13,208,96,125.61570247933884,118.28571428571429,105.57264096440738],[207,5,"49ers","Cowboys",42,10,253,170,125.61570247933884,151.8,167.6710935906012],[208,5,"Eagles","Rams",23,14,303,159,125.61570247933884,134.66666666666666,103.65274453974781],[209,5,"Steelers","Ravens",17,10,224,87,125.61570247933884,135.875,110.978868531984],[210,5,"Saints","Patriots",34,0,183,136,125.61570247933884,112.125,153.90781053296388],[211,5,"Chiefs","Vikings",27,20,281,67,125.61570247933884,112.55555555555556,115.86940434939768],[212,5,"Dolphins","Giants",31,16,308,222,125.61570247933884,132.77777777777777,120.74369191142968],[213,5,"Lions","Panthers",42,24,236,159,125.61570247933884,141.9090909090909,167.9413672680654],[214,5,"Jets","Broncos",31,21,199,234,125.61570247933884,124.5,144.4309022541354],[215,5,"Bengals","Cardinals",34,20,317,93,125.61570247933884,103.875,118.58230014816267],[216,5,"Colts","Titans",23,16,253,193,125.61570247933884,110.28571428571429,109.10663078226703],[217,5,"Jaguars","Bills",25,20,315,196,125.61570247933884,113.85714285714286,96.56401505092319],[218,5,"Falcons","Texans",21,19,351,96,125.61570247933884,152.8,91.42363457979526],[219,5,"Bears","Football Team",40,20,282,178,125.61570247933884,178.0,155.2191873607856],[220,4,"Seahawks","Giants",24,3,173,121,126.16666666666667,109.125,134.40396371617922],[221,4,"49ers","Cardinals",35,16,283,124,126.16666666666667,156.4,145.10547920667136],[222,4,"Chargers","Raiders",24,17,167,155,126.16666666666667,49.25,124.82103288359377],[223,4,"Eagles","Football Team",34,31,319,104,126.16666666666667,140.77777777777777,127.48929723791107],[224,4,"Titans","Bengals",27,3,242,173,126.16666666666667,137.0,131.0858792921365],[225,4,"Chiefs","Jets",23,20,203,204,126.16666666666667,97.33333333333333,120.33172867869766],[226,4,"Buccaneers","Saints",26,9,246,114,126.16666666666667,103.5,119.25803199346736],[227,4,"Jaguars","Falcons",23,7,207,105,126.16666666666667,126.85714285714286,125.44175028211092],[228,4,"Texans","Steelers",30,6,312,139,126.16666666666667,107.33333333333333,117.38705423773276],[229,4,"Cowboys","Patriots",38,3,281,124,126.16666666666667,119.5,139.96112397090008],[230,4,"Rams","Colts",29,23,319,164,126.16666666666667,127.0,114.82015197424434],[231,4,"Ravens","Browns",28,3,186,131,126.16666666666667,164.54545454545453,154.1296953174355],[232,4,"Broncos","Bears",31,28,223,97,126.16666666666667,112.16666666666667,135.8659796088904],[233,4,"Vikings","Panthers",21,13,139,135,126.16666666666667,97.5,133.39529793932968],[234,4,"Bills","Dolphins",48,20,320,104,126.16666666666667,146.8,164.71776457759208],[235,4,"Lions","Packers",34,20,210,211,126.16666666666667,137.1818181818182,154.04260531546072],[236,3,"Eagles","Buccaneers",25,11,277,201,125.96666666666667,130.0,114.99134216746036],[237,3,"Bengals","Rams",19,16,259,67,125.96666666666667,107.125,104.8703040894591],[238,3,"Bills","Football Team",37,3,218,168,125.96666666666667,140.4,152.66256500685674],[239,3,"Seahawks","Panthers",37,27,296,146,125.96666666666667,106.0,129.5143596857221],[240,3,"Colts","Ravens",22,19,227,139,125.96666666666667,118.0,118.77507556522136],[241,3,"Steelers","Raiders",23,18,235,105,125.96666666666667,133.625,122.21779036892654],[242,3,"Patriots","Jets",15,10,201,157,125.96666666666667,78.66666666666667,108.96401456842023],[243,3,"Chargers","Vikings",28,24,454,30,125.96666666666667,80.5,76.53939510614403],[244,3,"Dolphins","Broncos",70,20,376,350,125.96666666666667,118.55555555555556,174.15429156118293],[245,3,"Chiefs","Bears",41,10,303,153,125.96666666666667,103.0,135.43807241884898],[246,3,"Texans","Jaguars",37,17,280,86,125.96666666666667,113.22222222222223,136.4645749457117],[247,3,"Packers","Saints",18,17,259,95,125.96666666666667,138.57142857142858,110.46076434927771],[248,3,"Lions","Falcons",20,6,243,115,125.96666666666667,145.9090909090909,118.17325393103438],[249,3,"Cardinals","Cowboys",28,16,189,222,125.96666666666667,164.33333333333334,142.68824502450641],[250,3,"Browns","Titans",27,3,289,78,125.96666666666667,119.5,113.64374662482598],[251,3,"49ers","Giants",30,12,310,141,125.96666666666667,154.7,123.52308822901072],[252,2,"Steelers","Browns",26,22,222,55,125.86666666666666,139.875,130.76662627283955],[253,2,"Saints","Panthers",20,17,236,134,125.86666666666666,112.375,106.94941011039414],[254,2,"Buccaneers","Bears",27,17,317,120,125.86666666666666,102.75,105.45083500719265],[255,2,"49ers","Rams",30,23,206,159,125.86666666666666,152.9,145.0601584595935],[256,2,"Titans","Chargers",27,24,246,141,125.86666666666666,145.0,126.36291634157277],[257,2,"Dolphins","Patriots",24,17,249,145,125.86666666666666,141.33333333333334,121.08887628200993],[258,2,"Chiefs","Jaguars",17,9,305,101,125.86666666666666,108.77777777777777,90.25786740248942],[259,2,"Colts","Texans",31,20,227,126,125.86666666666666,119.85714285714286,136.68752997129678],[260,2,"Seahawks","Lions",37,31,328,82,125.86666666666666,114.0,125.22042372461203],[261,2,"Football Team","Broncos",35,33,299,122,125.86666666666666,96.0,125.93645109806641],[262,2,"Cowboys","Jets",30,10,255,134,125.86666666666666,118.5,126.61817303555983],[263,2,"Giants","Cardinals",31,28,321,127,125.86666666666666,128.75,117.16233307167019],[264,2,"Ravens","Bengals",27,24,237,178,125.86666666666666,160.27272727272728,131.89883964439375],[265,2,"Bills","Raiders",38,10,274,183,125.86666666666666,138.9,147.4469237418712],[266,2,"Falcons","Packers",25,24,237,211,125.86666666666666,129.8,123.21791081447421],[267,2,"Eagles","Vikings",34,28,193,259,125.86666666666666,123.55555555555556,149.19334287629127],[268,1,"Jets","Bills",22,16,140,172,127.86666666666666,134.83333333333334,143.38055761182795],[269,1,"Football Team","Cardinals",20,16,202,92,127.86666666666666,106.0,119.8008386588264],[270,1,"Rams","Seahawks",30,13,334,92,127.86666666666666,136.0,117.57259567128092],[271,1,"Dolphins","Chargers",36,34,466,70,127.86666666666666,149.66666666666666,99.49592268705474],[272,1,"Ravens","Texans",25,9,169,110,127.86666666666666,166.45454545454547,152.28781088063207],[273,1,"49ers","Steelers",30,7,220,188,127.86666666666666,150.0,147.57021732723695],[274,1,"Cowboys","Giants",40,0,143,122,127.86666666666666,119.7,178.85893724631885],[275,1,"Eagles","Patriots",25,20,170,97,127.86666666666666,141.55555555555554,145.7680196599015],[276,1,"Saints","Titans",16,15,305,69,127.86666666666666,120.5,81.79644685923316],[277,1,"Buccaneers","Vikings",20,17,173,73,127.86666666666666,108.625,125.19095432862],[278,1,"Raiders","Broncos",17,16,200,61,127.86666666666666,123.28571428571429,110.77086310866164],[279,1,"Jaguars","Colts",31,21,241,105,127.86666666666666,126.85714285714286,136.19775170139908],[280,1,"Browns","Bengals",24,3,154,206,127.86666666666666,106.7,136.40521185820273],[281,1,"Packers","Bears",38,20,245,92,127.86666666666666,139.0,160.24146439245186],[282,1,"Falcons","Panthers",24,10,115,130,127.86666666666666,146.0,160.4219000791676],[283,1,"Lions","Chiefs",21,20,253,118,127.86666666666666,145.63636363636363,117.35243673393619]],"featureTest":[["name",1,37.81507609501004,39.78651784334557],["tm_score",1,36.101030469021204,36.09077968725347],["opp_score",1,37.62452333243155,37.67629710739104],["pass_yds",1,37.117208658454686,37.063806551225674],["name + tm_score",2,36.25131729579749,38.53160265992927],["name + opp_score",2,38.02165812481794,40.106656696568635],["name + pass_yds",2,36.89597529186387,38.669775863026175],["tm_score + opp_score",2,36.36410033841568,36.43121081083145],["tm_score + pass_yds",2,34.233915306589495,34.25417377907735],["opp_score + pass_yds",2,36.79402895788477,36.72666575106114],["name + tm_score + opp_score",3,36.53907653021412,38.68225239337033],["name + tm_score + pass_yds",3,34.05707733494696,36.230734487326],["name + opp_score + pass_yds",3,36.64785229857859,38.64342685516297],["tm_score + opp_score + pass_yds",3,34.32470964824404,34.36072602955839],["name + tm_score + opp_score + pass_yds",4,34.092008479159894,36.42817334046626],["4 columns + opp_name",5,34.06029062245929,38.79320322189452],["4 columns + week",5,34.342658053563866,36.811516010116364],["4 columns + 10 noise columns",14,34.67431942819466,37.73481914994716],["4 columns + opp_name + week + 10 noise",16,34.883601811185414,40.18839412445006]],"ci":{"stats2 (overall mean)":{"mae":[37.0,61.9],"mse":[1715.0,4678.0]},"stats3 (team mean)":{"mae":[35.5,58.3],"mse":[1537.0,4037.0]},"stats4 (ridge model)":{"mae":[27.8,49.6],"mse":[1055.0,3056.0]}},"prereg":[{"dataframe":"stats2","method":"Overall mean","expected MAE":37.62,"expected MSE":2391.29,"expected rank (MAE)":2,"expected rank (MSE)":2},{"dataframe":"stats3","method":"Team mean","expected MAE":39.79,"expected MSE":2502.01,"expected rank (MAE)":3,"expected rank (MSE)":3},{"dataframe":"stats4","method":"Ridge regression","expected MAE":34.09,"expected MSE":1932.22,"expected rank (MAE)":1,"expected rank (MSE)":1}],"cvTable":{"Ridge regression":[34.092008479159894,2.007403463037448],"Linear regression":[36.42817334046626,1.9162700824097274],"Random forest":[37.02083906871484,2.047103593486795],"Overall mean (stats2 method)":[37.61647555686596,2.294346003087668],"Team mean (stats3 method)":[39.78651784334558,2.0622878766912174],"Gradient boosting":[40.557904399844624,2.347795579539218]},"headToHead":[{"a":"stats4 (ridge model)","b":"stats2 (overall mean)","diff":-10.5,"lo":-18.8125,"hi":-1.75,"pBetter":0.9902},{"a":"stats4 (ridge model)","b":"stats3 (team mean)","diff":-8.0,"lo":-19.5625,"hi":3.875,"pBetter":0.9055},{"a":"stats3 (team mean)","b":"stats2 (overall mean)","diff":-2.5,"lo":-11.501562499999999,"hi":7.5,"pBetter":0.7024}],"alignment":{"matched":272,"games":272,"knownEqual":256,"known":256}}</script>
+<script>
+// Scoring engine for the Imputation Lab. Pure functions, no DOM.
+// games rows: [id, week, team, opp, tm_score, opp_score, pass_yds, actual, mean, team, model]
+var METHODS = ['mean', 'team', 'model'];
+var COL = { mean: 8, team: 9, model: 10 };
+
+function scoreRows(rows) {
+  var out = {};
+  METHODS.forEach(function (m) {
+    var ae = 0, se = 0;
+    rows.forEach(function (g) { var e = g[COL[m]] - g[7]; ae += Math.abs(e); se += e * e; });
+    var n = rows.length;
+    out[m] = { mae: ae / n, mse: se / n, rmse: Math.sqrt(se / n), n: n };
+  });
+  return out;
+}
+
+function weekRows(games, week) { return games.filter(function (g) { return g[1] === week; }); }
+
+function allWeeks(games) {
+  var weeks = Array.from(new Set(games.map(function (g) { return g[1]; }))).sort(function (a, b) { return a - b; });
+  return weeks.map(function (w) {
+    var s = scoreRows(weekRows(games, w));
+    var best = METHODS[0];                       // ties go to the first method, like pandas idxmin
+    METHODS.forEach(function (m) { if (s[m].mae < s[best].mae) best = m; });
+    return { week: w, scores: s, winner: best };
+  });
+}
+
+function winCounts(weeks) {
+  var c = { mean: 0, team: 0, model: 0 };
+  weeks.forEach(function (w) { c[w.winner]++; });
+  return c;
+}
+
+if (typeof module !== 'undefined') module.exports = { scoreRows: scoreRows, weekRows: weekRows, allWeeks: allWeeks, winCounts: winCounts, METHODS: METHODS };
+
+
+(function () {
+  var data = JSON.parse(document.getElementById('dataset').textContent);
+  var games = data.games;
+  var NAMES = { model: 'Model (ridge)', team: 'Team mean', mean: 'Overall mean' };
+  var FRAMES = { model: 'stats4', team: 'stats3', mean: 'stats2' };
+  var ORDER = ['model', 'team', 'mean'];
+  var VAR = { model: '--m-model', team: '--m-team', mean: '--m-mean' };
+  var NOTEBOOK_W12 = { mean: { mae: 48.875, mse: 3052.375 }, team: { mae: 46.375, mse: 2697.0 }, model: { mae: 38.375, mse: 1972.375 } };
+  var state = { week: 12, metric: 'mae', model: 'ridge' };
+  var fmt1 = function (v) { return v.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); };
+  var fmt2 = function (v) { return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+  var fmtM = function (v) { return state.metric === 'mse' ? Math.round(v).toLocaleString('en-US') : fmt1(v); };
+  var $ = function (id) { return document.getElementById(id); };
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  function el(tag, attrs, parent) { var n = document.createElementNS(SVGNS, tag); for (var k in attrs) n.setAttribute(k, attrs[k]); if (parent) parent.appendChild(n); return n; }
+  function txt(parent, tag, text, cls) { var n = document.createElement(tag); if (cls) n.className = cls; n.textContent = text; parent.appendChild(n); return n; }
+  var seasons = allWeeks(games);
+  var wins = winCounts(seasons);
+  var w12 = scoreRows(weekRows(games, 12));
+
+  // ---------- verdict ----------
+  (function verdict() {
+    var ranked = ORDER.slice().sort(function (a, b) { return w12[a].mae - w12[b].mae; });
+    $('headline').textContent = 'The model missed week 12 by ' + fmt1(w12.model.mae) + ' yards per game, ' +
+      fmt1(w12.mean.mae - w12.model.mae) + ' fewer than the overall average.';
+    var matches = ORDER.every(function (m) { return Math.abs(w12[m].mae - NOTEBOOK_W12[m].mae) < 1e-9 && Math.abs(w12[m].mse - NOTEBOOK_W12[m].mse) < 1e-9; });
+    var badge = $('match-badge');
+    badge.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 4.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    badge.appendChild(document.createTextNode(matches ? 'Matches the notebook (Part 8)' : 'Does not match the notebook'));
+    var cards = $('cards'), ciKey = { model: 'stats4 (ridge model)', team: 'stats3 (team mean)', mean: 'stats2 (overall mean)' };
+    ranked.forEach(function (m, i) {
+      var c = document.createElement('div'); c.className = 'card';
+      var top = document.createElement('div'); top.className = 'card-top';
+      var nm = document.createElement('span'); nm.className = 'method-name';
+      var k = document.createElement('i'); k.className = 'key'; k.style.background = 'var(' + VAR[m] + ')'; nm.appendChild(k);
+      nm.appendChild(document.createTextNode(NAMES[m] + ' · ' + FRAMES[m]));
+      top.appendChild(nm); txt(top, 'span', ['1st', '2nd', '3rd'][i], 'rank' + (i === 0 ? ' first' : '')); c.appendChild(top);
+      var big = txt(c, 'div', fmt2(w12[m].mae), 'big'); txt(big, 'small', 'yards MAE');
+      txt(c, 'div', 'MSE ' + fmt2(w12[m].mse) + ' · RMSE ' + fmt2(w12[m].rmse), 'sub num');
+      var ci = data.ci[ciKey[m]];
+      txt(c, 'div', '95% range from resampling: MAE ' + fmt1(ci.mae[0]) + ' to ' + fmt1(ci.mae[1]), 'sub');
+      cards.appendChild(c);
+    });
+  })();
+
+  // ---------- controls ----------
+  var weekSeg = $('week-seg');
+  seasons.forEach(function (s) {
+    var b = document.createElement('button'); b.type = 'button'; b.textContent = s.week; b.dataset.week = s.week;
+    b.setAttribute('aria-label', 'Week ' + s.week + (s.week === 12 ? ' (the missing week)' : ''));
+    if (s.week === 12) b.className = 'missing';
+    b.addEventListener('click', function () { state.week = s.week; render(); });
+    weekSeg.appendChild(b);
+  });
+  document.querySelectorAll('[data-metric]').forEach(function (b) { b.addEventListener('click', function () { state.metric = b.dataset.metric; render(); }); });
+  document.querySelectorAll('[data-model]').forEach(function (b) { b.addEventListener('click', function () { state.model = b.dataset.model; drawFeatures(); syncButtons(); }); });
+  function syncButtons() {
+    document.querySelectorAll('[data-metric]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.metric === state.metric); });
+    document.querySelectorAll('[data-week]').forEach(function (b) { b.setAttribute('aria-pressed', +b.dataset.week === state.week); });
+    document.querySelectorAll('[data-model]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.model === state.model); });
+  }
+
+  // ---------- tooltip ----------
+  var tip = $('tip');
+  function showTip(x, y, build) {
+    tip.textContent = ''; build(tip); tip.hidden = false;
+    var r = tip.getBoundingClientRect(), left = x + 14, top = y + 14;
+    if (left + r.width > window.innerWidth - 8) left = x - r.width - 14;
+    if (top + r.height > window.innerHeight - 8) top = y - r.height - 14;
+    tip.style.left = Math.max(8, left) + 'px'; tip.style.top = Math.max(8, top) + 'px';
+  }
+  function hideTip() { tip.hidden = true; }
+  function tipRow(parent, varName, text) {
+    var r = document.createElement('div'); r.className = 'row';
+    var k = document.createElement('i'); k.className = 'k'; k.style.background = varName ? 'var(' + varName + ')' : 'var(--ink)';
+    r.appendChild(k); r.appendChild(document.createTextNode(text)); parent.appendChild(r);
+  }
+
+  // ---------- games panel ----------
+  function drawGames() {
+    var rows = weekRows(games, state.week).slice().sort(function (a, b) { return b[7] - a[7]; });
+    var s = scoreRows(rows);
+    $('games-title').textContent = 'Week ' + state.week + ', game by game';
+    $('games-caption').textContent = state.week === 12
+      ? 'The 16 filled values next to the answer key. Each row is one game, sorted by actual rushing yards.'
+      : 'Hidden-week test: these guesses were made without week ' + state.week + ', using only the other 16 known weeks.';
+    var ws = $('week-scores'); ws.textContent = '';
+    var best = seasons.filter(function (w) { return w.week === state.week; })[0].winner;   // same rule as the scoring engine
+    ORDER.forEach(function (m) {
+      var p = document.createElement('span'); p.className = 'pill' + (m === best ? ' win' : '');
+      var k = document.createElement('i'); k.className = 'key'; k.style.width = k.style.height = '9px'; k.style.background = 'var(' + VAR[m] + ')'; p.appendChild(k);
+      p.appendChild(document.createTextNode(NAMES[m] + ' ' + state.metric.toUpperCase() + ' '));
+      txt(p, 'strong', fmtM(s[m][state.metric]));
+      if (m === best) p.appendChild(document.createTextNode(' · lowest MAE'));
+      ws.appendChild(p);
+    });
+    var host = $('games-chart'); host.textContent = '';
+    var W = Math.max(300, host.clientWidth), rowH = 24, padL = 104, padR = 14, padT = 8, padB = 26, H = padT + rows.length * rowH + padB;
+    var svg = el('svg', { viewBox: '0 0 ' + W + ' ' + H, width: W, height: H, role: 'img', 'aria-label': 'Week ' + state.week + ' actual rushing yards and each method’s guess' }, host);
+    var max = 0; rows.forEach(function (g) { max = Math.max(max, g[7], g[8], g[9], g[10]); });
+    var top = Math.ceil(max / 50) * 50, x = function (v) { return padL + (v / top) * (W - padL - padR); };
+    for (var t = 0; t <= top; t += 50) {
+      el('line', { x1: x(t), x2: x(t), y1: padT, y2: H - padB, stroke: 'var(--grid)', 'stroke-width': 1 }, svg);
+      el('text', { x: x(t), y: H - 8, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--muted)', class: 'num' }, svg).textContent = t;
+    }
+    rows.forEach(function (g, i) {
+      var y = padT + i * rowH + rowH / 2, vals = [g[7], g[8], g[9], g[10]];
+      var gEl = el('g', { class: 'hit', tabindex: 0, role: 'img', 'aria-label': g[2] + ' vs ' + g[3] + ': actual ' + g[7] }, svg);
+      el('rect', { x: 0, y: y - rowH / 2, width: W, height: rowH, fill: 'transparent' }, gEl);
+      el('text', { x: padL - 10, y: y + 4, 'text-anchor': 'end', 'font-size': 12, fill: 'var(--ink-2)' }, gEl).textContent = g[2];
+      el('line', { x1: x(Math.min.apply(null, vals)), x2: x(Math.max.apply(null, vals)), y1: y, y2: y, stroke: 'var(--rule)', 'stroke-width': 2 }, gEl);
+      ['mean', 'team', 'model'].forEach(function (m) {
+        el('circle', { cx: x(g[COL[m]]), cy: y, r: 5, fill: 'var(' + VAR[m] + ')', stroke: 'var(--surface)', 'stroke-width': 2 }, gEl);
+      });
+      var a = x(g[7]);
+      el('path', { d: 'M' + a + ',' + (y - 6) + 'L' + (a + 6) + ',' + y + 'L' + a + ',' + (y + 6) + 'L' + (a - 6) + ',' + y + 'Z', fill: 'var(--ink)', stroke: 'var(--surface)', 'stroke-width': 1.5 }, gEl);
+      var show = function (cx, cy) {
+        showTip(cx, cy, function (tp) {
+          txt(tp, 'strong', g[2] + ' ' + g[4] + ', ' + g[3] + ' ' + g[5]);
+          tipRow(tp, null, 'Actual: ' + g[7] + ' rushing yards');
+          ORDER.forEach(function (m) { var v = g[COL[m]]; tipRow(tp, VAR[m], NAMES[m] + ': ' + fmt1(v) + ' (off by ' + fmt1(Math.abs(v - g[7])) + ')'); });
+        });
+      };
+      gEl.addEventListener('pointermove', function (e) { show(e.clientX, e.clientY); });
+      gEl.addEventListener('pointerleave', hideTip);
+      gEl.addEventListener('focus', function () { var b = gEl.getBoundingClientRect(); show(b.left + 120, b.top); });
+      gEl.addEventListener('blur', hideTip);
+    });
+  }
+
+  // ---------- season panel ----------
+  function drawSeason() {
+    var metric = state.metric;
+    $('season-caption').textContent = 'Each week’s ' + metric.toUpperCase() + ' for each method. Week 12 is scored against the answer key; the other 17 weeks come from the hidden-week test. Click a point to open that week.';
+    var w = $('wins'); w.textContent = '';
+    ORDER.forEach(function (m) {
+      var p = document.createElement('span'); p.className = 'pill' + (m === 'model' ? ' win' : '');
+      var k = document.createElement('i'); k.className = 'key'; k.style.width = k.style.height = '9px'; k.style.background = 'var(' + VAR[m] + ')'; p.appendChild(k);
+      p.appendChild(document.createTextNode(NAMES[m] + ': lowest MAE in '));
+      txt(p, 'strong', wins[m] + ' of ' + seasons.length); p.appendChild(document.createTextNode(' weeks'));
+      w.appendChild(p);
+    });
+    var host = $('season-chart'); host.textContent = '';
+    var W = Math.max(300, host.clientWidth), H = 260, padL = metric === 'mse' ? 52 : 40, padR = 12, padT = 12, padB = 30;
+    var svg = el('svg', { viewBox: '0 0 ' + W + ' ' + H, width: W, height: H, role: 'img', 'aria-label': 'Error per week for each method' }, host);
+    var max = 0; seasons.forEach(function (s) { ORDER.forEach(function (m) { max = Math.max(max, s.scores[m][metric]); }); });
+    var step = metric === 'mse' ? 1000 : 10, top = Math.ceil(max / step) * step;
+    var n = seasons.length, x = function (i) { return padL + (i + 0.5) * (W - padL - padR) / n; }, y = function (v) { return padT + (H - padT - padB) * (1 - v / top); };
+    for (var t = 0; t <= top; t += step) {
+      el('line', { x1: padL, x2: W - padR, y1: y(t), y2: y(t), stroke: t === 0 ? 'var(--muted)' : 'var(--grid)', 'stroke-width': 1 }, svg);
+      el('text', { x: padL - 6, y: y(t) + 4, 'text-anchor': 'end', 'font-size': 11, fill: 'var(--muted)', class: 'num' }, svg).textContent = t.toLocaleString('en-US');
+    }
+    var sel = seasons.findIndex(function (s) { return s.week === state.week; });
+    el('rect', { x: x(sel) - (W - padL - padR) / n / 2, y: padT, width: (W - padL - padR) / n, height: H - padT - padB, fill: 'var(--surface-2)' }, svg);
+    var band = (W - padL - padR) / n;
+    seasons.forEach(function (s, i) {
+      if (band < 20 && [1, 6, 12, 18, state.week].indexOf(s.week) === -1) return;   // thin out labels on narrow screens
+      el('text', { x: x(i), y: H - 10, 'text-anchor': 'middle', 'font-size': 11, fill: s.week === 12 ? 'var(--ink)' : 'var(--muted)', 'font-weight': s.week === 12 ? 700 : 400 }, svg).textContent = s.week;
+    });
+    ['mean', 'team', 'model'].forEach(function (m) {
+      var d = seasons.map(function (s, i) { return (i ? 'L' : 'M') + x(i) + ',' + y(s.scores[m][metric]); }).join('');
+      el('path', { d: d, fill: 'none', stroke: 'var(' + VAR[m] + ')', 'stroke-width': m === 'model' ? 2.5 : 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, svg);
+    });
+    seasons.forEach(function (s, i) {
+      ['mean', 'team', 'model'].forEach(function (m) {
+        el('circle', { cx: x(i), cy: y(s.scores[m][metric]), r: s.week === state.week ? 5 : 3.5, fill: 'var(' + VAR[m] + ')', stroke: 'var(--surface)', 'stroke-width': 2 }, svg);
+      });
+      var hit = el('rect', { class: 'hit', x: x(i) - (W - padL - padR) / n / 2, y: padT, width: (W - padL - padR) / n, height: H - padT - padB, fill: 'transparent', tabindex: 0, role: 'button', 'aria-label': 'Week ' + s.week }, svg);
+      var show = function (cx, cy) {
+        showTip(cx, cy, function (tp) {
+          txt(tp, 'strong', 'Week ' + s.week + (s.week === 12 ? ' (the missing week)' : ''));
+          ORDER.forEach(function (m) { tipRow(tp, VAR[m], NAMES[m] + ': ' + metric.toUpperCase() + ' ' + fmtM(s.scores[m][metric])); });
+          tipRow(tp, null, 'Lowest MAE: ' + NAMES[s.winner]);
+        });
+      };
+      hit.addEventListener('pointermove', function (e) { show(e.clientX, e.clientY); });
+      hit.addEventListener('pointerleave', hideTip);
+      hit.addEventListener('click', function () { state.week = s.week; render(); });
+      hit.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); state.week = s.week; render(); } });
+    });
+    // table twin
+    var tw = $('season-table'); tw.textContent = '';
+    var table = document.createElement('table'), hr = table.createTHead().insertRow();
+    ['Week'].concat(ORDER.map(function (m) { return NAMES[m] + ' ' + metric.toUpperCase(); }), ['Lowest MAE']).forEach(function (h, i) {
+      var th = document.createElement('th'); th.textContent = h; if (i && i < 4) th.className = 'n'; hr.appendChild(th); });
+    var tb = table.createTBody();
+    seasons.forEach(function (s) {
+      var tr = tb.insertRow(); var c0 = tr.insertCell(); c0.textContent = s.week + (s.week === 12 ? ' (missing)' : '');
+      ORDER.forEach(function (m) { var c = tr.insertCell(); c.className = 'n'; c.textContent = fmtM(s.scores[m][metric]); });
+      tr.insertCell().textContent = NAMES[s.winner];
+    });
+    tw.appendChild(table);
+  }
+  $('season-toggle').addEventListener('click', function (e) {
+    var on = e.currentTarget.getAttribute('aria-pressed') !== 'true';
+    e.currentTarget.setAttribute('aria-pressed', on); e.currentTarget.textContent = on ? 'Show chart' : 'Show table';
+    $('season-table').hidden = !on; $('season-chart').hidden = on;
+  });
+
+  // ---------- feature panel ----------
+  function drawFeatures() {
+    var col = state.model === 'ridge' ? 2 : 3;
+    var rows = data.featureTest.slice().sort(function (a, b) { return a[col] - b[col]; });
+    var host = $('feature-chart'); host.textContent = '';
+    var W = Math.max(300, host.clientWidth), narrow = W < 560;
+    var rowH = narrow ? 36 : 22, padL = narrow ? 8 : Math.min(260, W * 0.5), padR = 52, padT = 4, padB = 24, H = padT + rows.length * rowH + padB;
+    var svg = el('svg', { viewBox: '0 0 ' + W + ' ' + H, width: W, height: H, role: 'img', 'aria-label': 'Error for each set of columns' }, host);
+    var lo = 30, hi = 42, x = function (v) { return padL + (Math.min(Math.max(v, lo), hi) - lo) / (hi - lo) * (W - padL - padR); };
+    for (var t = lo; t <= hi; t += 2) {
+      el('line', { x1: x(t), x2: x(t), y1: padT, y2: H - padB, stroke: 'var(--grid)', 'stroke-width': 1 }, svg);
+      el('text', { x: x(t), y: H - 8, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--muted)', class: 'num' }, svg).textContent = t;
+    }
+    rows.forEach(function (r, i) {
+      var y = padT + i * rowH, assignment = r[0] === 'name + tm_score + opp_score + pass_yds';
+      var label = r[0].replace('name + tm_score + opp_score + pass_yds', 'the 4 assignment columns').replace('+ 10 noise columns', '+ noise').replace('+ 10 noise', '+ noise');
+      var tx = el('text', narrow ? { x: padL, y: y + 13, 'font-size': 11.5, fill: assignment ? 'var(--ink)' : 'var(--ink-2)', 'font-weight': assignment ? 700 : 400 }
+                                 : { x: padL - 8, y: y + rowH / 2 + 4, 'text-anchor': 'end', 'font-size': 11.5, fill: assignment ? 'var(--ink)' : 'var(--ink-2)', 'font-weight': assignment ? 700 : 400 }, svg);
+      tx.textContent = label;                       // on narrow screens each label sits on its own line, above its dot
+      var cy = narrow ? y + 26 : y + rowH / 2;          // dots, not bars: the axis starts at 30, so bar length would exaggerate gaps
+      el('line', { x1: padL, x2: x(r[col]), y1: cy, y2: cy, stroke: 'var(--grid)', 'stroke-width': 1 }, svg);
+      el('circle', { cx: x(r[col]), cy: cy, r: assignment ? 6 : 4.5, fill: assignment ? 'var(--m-model)' : 'var(--muted)', stroke: 'var(--surface)', 'stroke-width': 2 }, svg);
+      el('text', { x: x(r[col]) + 10, y: cy + 4, 'font-size': 11.5, fill: 'var(--ink)', class: 'num' }, svg).textContent = fmt2(r[col]);
+    });
+  }
+
+  // ---------- fairness ----------
+  (function fairness() {
+    var t = $('prereg-table'), hr = t.createTHead().insertRow();
+    ['', 'Method', 'Expected MAE', 'Actual MAE', 'Expected rank', 'Actual rank', 'Expected MSE', 'Actual MSE'].forEach(function (h, i) {
+      var th = document.createElement('th'); th.textContent = h; if (i > 1) th.className = 'n'; hr.appendChild(th); });
+    var key = { stats2: 'mean', stats3: 'team', stats4: 'model' };
+    var actualRank = ORDER.slice().sort(function (a, b) { return w12[a].mae - w12[b].mae; });
+    var tb = t.createTBody();
+    data.prereg.forEach(function (r) {
+      var m = key[r.dataframe], tr = tb.insertRow();
+      var c0 = tr.insertCell(), k = document.createElement('i'); k.className = 'key'; k.style.background = 'var(' + VAR[m] + ')'; c0.appendChild(k);
+      tr.insertCell().textContent = r.dataframe + ' · ' + r.method;
+      [fmt2(r['expected MAE']), fmt2(w12[m].mae), r['expected rank (MAE)'], actualRank.indexOf(m) + 1, fmt2(r['expected MSE']), fmt2(w12[m].mse)].forEach(function (v) {
+        var c = tr.insertCell(); c.className = 'n'; c.textContent = v; });
+    });
+    var a = data.alignment;
+    $('align-text').textContent = 'The answer key was joined on week + team, with a one-to-one check. All ' + a.matched + ' of ' + a.games +
+      ' games matched, and on the ' + a.known + ' games that already had a value, the answer key agrees exactly (' + a.knownEqual + ' of ' + a.known + '). So the rows are lined up correctly before anything is scored.';
+    var list = $('h2h-list');
+    var short = function (s) { return s.indexOf('ridge') > -1 ? 'The model' : s.indexOf('team') > -1 ? 'The team mean' : 'the overall mean'; };
+    data.headToHead.forEach(function (h) {
+      txt(list, 'li', short(h.a) + ' vs ' + short(h.b).toLowerCase() + ': ' + (h.diff > 0 ? '+' : '') + fmt2(h.diff) + ' yards MAE, better in ' +
+        (h.pBetter * 100).toFixed(1) + '% of 10,000 resamples (95% range ' + fmt1(h.lo) + ' to ' + fmt1(h.hi) + ')');
+    });
+  })();
+
+  function render() { syncButtons(); drawGames(); drawSeason(); }
+  var widths = new Map();
+  var ro = new ResizeObserver(function (entries) {
+    entries.forEach(function (e) {
+      var w = Math.round(e.contentRect.width); if (widths.get(e.target) === w) return; widths.set(e.target, w);
+      if (e.target.id === 'feature-chart') drawFeatures(); else if (e.target.id === 'games-chart') drawGames(); else drawSeason();
+    });
+  });
+  render(); drawFeatures();
+  ['games-chart', 'season-chart', 'feature-chart'].forEach(function (id) { ro.observe($(id)); });
+})();
+</script>
+
+</body>
+</html>
