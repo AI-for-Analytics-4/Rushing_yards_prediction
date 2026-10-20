@@ -1,0 +1,17 @@
+,name,opp_name,tm_score,pass_yds,actual,mean,team mean,model,mean error,team mean error,model error,closest
+104,Bears,Vikings,12,217,118,127,178,108,9,60,10,mean
+105,Ravens,Chargers,20,177,197,127,162,134,70,35,63,team mean
+106,Chiefs,Raiders,31,298,69,127,108,121,58,39,52,team mean
+107,Eagles,Bills,37,200,185,127,137,159,58,48,26,model
+108,Titans,Panthers,17,185,80,127,144,122,47,64,42,model
+109,Giants,Patriots,10,191,58,127,128,104,69,70,46,model
+110,Jaguars,Texans,24,364,81,127,124,91,46,43,10,model
+111,Broncos,Browns,29,134,169,127,110,153,42,59,16,model
+112,Rams,Cardinals,37,229,228,127,131,155,101,97,73,model
+113,Colts,Buccaneers,27,251,155,127,121,124,28,34,31,mean
+114,Steelers,Bengals,16,278,153,127,130,97,26,23,56,team mean
+115,Falcons,Saints,24,168,228,127,143,142,101,85,86,team mean
+116,Dolphins,Jets,34,243,167,127,142,146,40,25,21,model
+117,49ers,Seahawks,31,209,169,127,153,150,42,16,19,team mean
+118,Packers,Lions,29,268,109,127,133,129,18,24,20,mean
+119,Cowboys,Football Team,45,331,100,127,120,143,27,20,43,team mean
