@@ -41,8 +41,8 @@ The model's MAE (38.38 yards) is 10.5 yards lower than the overall mean's, and t
 Sixteen games is a small test, so every known week was also hidden in turn and predicted from the other 16 known weeks (leave-one-week-out):
 
 - **The model had the lowest error in 15 of 18 weeks.**
-- **The team mean beat the overall mean in only 7 of 18 weeks** by MAE (10 by MSE), even though it uses more information.
-- One caveat: the 17 known weeks are the same hidden-week results used to *choose* the model. Week 12 is the only fully independent test, and the model won it too.
+- **The team mean and the overall mean split the weeks.** The team mean was better in 7 of 18 weeks by MAE and 10 of 18 by MSE, even though it uses more information.
+- One caveat: the 17 known weeks are the same hidden-week results used to *choose* the model. Week 12 is the only week not used to choose the model, and the model won it too.
 
 Week 12 itself was a heavy rushing week: it averaged 141.6 yards, the 5th-highest of 18 weeks and inside the normal range (p = 0.31). So all three methods guessed low on average.
 
@@ -60,7 +60,7 @@ The column test is extra work beyond the assignment. Count what the model actual
 |---|---|---|---|
 | 1 | Any nulls? | Only `rush_yds`: 16 of 272 (5.88%) | Part 1 |
 | 1 | Do the null rows share anything? | **All are week 12, and every week-12 game is null.** Otherwise week 12 is typical: its scores and passing yards match the other weeks (all p > 0.3) | Part 1, `part1_exploration.md` |
-| 2 | Load `stats`; make `stats2`–`stats4` | Done. Filling the copies left `stats` untouched (still 16 nulls, asserted) | Part 2 |
+| 2 | Load `stats`; make `stats2`–`stats4` | Done. The copies are independent (checked in Part 2), and `stats` still has its 16 nulls after all three fills (asserted in Part 6) | Parts 2 and 6 |
 | 4 | Mean fill, kept as int | 127 for all 16 games. `int64`, no nulls, known values untouched (all asserted) | Part 4 |
 | 5 | Team-mean fill, kept as int | 108 (Chiefs) to 178 (Bears); hand-checked for 3 teams; no fallback needed | Part 5 |
 | 6 | Model fill from 4 columns, kept as int | Ridge regression, chosen among 4 models by leave-one-week-out cross-validation; predictions from 91 to 159 | Part 6 |
@@ -119,10 +119,10 @@ Claude (Anthropic's AI, working in Cowork) read the data, proposed approaches, w
 | File | What it is |
 |---|---|
 | `README.md` | This page |
-| `part1_exploration.md` | Part 1: the null analysis and the plan, before any code |
+| `part1_exploration.md` | Part 1: the null analysis and the plan, before any modeling |
 | `rushing_yards_imputation.ipynb` | Parts 1 to 8, executed with all outputs |
 | `reflection.md` | Part 9 reflection (the emailed deliverable) |
-| `imputation_lab.html` | Interactive dashboard (self-contained; works offline, with system fonts) |
+| `imputation_lab.html` | Interactive dashboard in one file, with all its data and code inside. It loads two web fonts when online and falls back to system fonts offline |
 | `requirements.txt` | Python packages |
 | `data/season_stats.csv`, `data/actual.csv` | The work file and the answer key |
 | `results/preregistered_expectations.csv` | Expected errors, committed before Part 7 |

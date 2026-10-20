@@ -16,9 +16,9 @@ Each answer below is backed by results from `rushing_yards_imputation.ipynb`. Th
 
 * **The model usually won.**
   * On week 12 it had the lowest error on both metrics: MAE 38.38 vs 48.88 for the overall mean, and MSE 1,972 vs 3,052.
-  * Scoring every week the same way, it had the lowest error in **15 of 18 weeks**. Seventeen of those weeks are the same hidden-week results used to choose the model, so week 12 is the only fully independent test, and the model won it too.
+  * Scoring every week the same way, it had the lowest error in **15 of 18 weeks**. Seventeen of those weeks are the same hidden-week results used to choose the model, so week 12 is the only week not used to choose the model, and the model won it too.
 * **But the middle option was not reliably better than the simplest.**
-  * The team mean is more complex than the overall mean, yet it beat it in only **7 of 18 weeks** by MAE (10 by MSE).
+  * The team mean is more complex than the overall mean, yet the two split the weeks: the team mean was better in **7 of 18 weeks** by MAE and **10 of 18** by MSE.
   * It was *worse* in cross-validation (39.79 vs 37.62).
   * It won on week 12 by just 2.5 yards, a gap that resampling can't separate from noise.
 * **The most complex model was the worst.**
@@ -78,7 +78,7 @@ More *rows* usually mean more accuracy. More *columns* only help when they carry
 
 * **Hide whole weeks.** Each of the 17 known weeks was hidden in turn and predicted from the other 16 (leave-one-week-out cross-validation). This mirrors how the real data was missing.
 * **It worked.** The estimates, committed to git before any code read the answer key, picked the right winner: the model ranked first on both metrics, as predicted.
-* **Its errors were optimistic for this particular week.** Week 12 was hard to guess: a heavy rushing week whose games also varied unusually widely (standard deviation 55.0 yards, 4th-highest of 18 weeks). Even the best possible single number for all 16 games would have scored an MAE of 45.62. Still, every method's week-12 error landed inside the range the hidden-week test had produced. For the model, that range was 22.4 to 49.6 yards, and week 12 came in at 38.4.
+* **Its errors were optimistic for this particular week.** Week 12 was hard to guess: a heavy rushing week whose games were also more spread out than most weeks (standard deviation 55.0 yards, 4th-highest of 18 weeks). Even the best possible single number for all 16 games (any value from 153 to 155 yards) would have scored an MAE of 45.62. Still, every method's week-12 error landed inside the range the hidden-week test had produced. For the model, that range was 22.4 to 49.6 yards, and week 12 came in at 38.4.
 
 Other checks Claude can design and run without an answer key:
 
