@@ -225,7 +225,7 @@ footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--rul
             <tr><td class="wrap"><code>tm_score</code> helps most</td><td class="wrap">Best single column (ridge 36.10)</td><td class="verdict-cell">Right</td></tr>
             <tr><td class="wrap"><code>pass_yds</code> also helps</td><td class="wrap">With <code>tm_score</code>: 34.23</td><td class="verdict-cell">Right</td></tr>
             <tr><td class="wrap"><code>opp_score</code> helps alongside <code>tm_score</code></td><td class="wrap">36.36, no better than <code>tm_score</code> alone (36.10)</td><td class="verdict-cell">Wrong</td></tr>
-            <tr><td class="wrap">Team columns add little and hurt plain linear regression</td><td class="wrap">Ridge 34.23 → 34.06; linear 34.25 → 36.23</td><td class="verdict-cell">Right</td></tr>
+            <tr><td class="wrap">Team columns “will add little, or even hurt a plain linear regression”</td><td class="wrap">Ridge 34.23 → 34.06; linear 34.25 → 36.23</td><td class="verdict-cell">Right</td></tr>
             <tr><td class="wrap">Extra columns make it worse</td><td class="wrap">Week and noise hurt; <code>opp_name</code> made no real difference with ridge</td><td class="verdict-cell">Mostly right</td></tr>
           </tbody>
         </table>
@@ -258,7 +258,7 @@ footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--rul
     </div>
   </section>
 
-  <footer>Data: the class's <span class="num">season_stats.csv</span> (272 games, 16 missing <span class="num">rush_yds</span> values, all in week 12) and <span class="num">actual.csv</span> (the answer key). For weeks other than 12, the predictions come from the hidden-week test: each week was predicted from the other 16 known weeks. This page's scoring engine reproduces the notebook's numbers exactly (117 checks, 0 mismatches). Analysis: <span class="num">rushing_yards_imputation.ipynb</span> in Juan's GitHub submission. Built with Claude as a pair programmer.</footer>
+  <footer>Data: the class's <span class="num">season_stats.csv</span> (272 games, 16 missing <span class="num">rush_yds</span> values, all in week 12) and <span class="num">actual.csv</span> (the answer key). For weeks other than 12, the predictions come from the hidden-week test: each week was predicted from the other 16 known weeks. This page's scoring engine was checked against the same calculations in Python (117 checks, 0 mismatches). Analysis: <span class="num">rushing_yards_imputation.ipynb</span> in Juan's GitHub submission. Built with Claude as a pair programmer.</footer>
 </div>
 
 <div class="tip" id="tip" hidden></div>
@@ -549,7 +549,7 @@ if (typeof module !== 'undefined') module.exports = { scoreRows: scoreRows, week
     var short = function (s) { return s.indexOf('ridge') > -1 ? 'The model' : s.indexOf('team') > -1 ? 'The team mean' : 'the overall mean'; };
     data.headToHead.forEach(function (h) {
       txt(list, 'li', short(h.a) + ' vs ' + short(h.b).toLowerCase() + ': ' + (h.diff > 0 ? '+' : '') + fmt2(h.diff) + ' yards MAE, better in ' +
-        (h.pBetter * 100).toFixed(1) + '% of 10,000 resamples (95% range ' + fmt1(h.lo) + ' to ' + fmt1(h.hi) + ')');
+        Math.round(h.pBetter * 10000).toLocaleString('en-US') + ' of 10,000 resamples (95% range ' + fmt1(h.lo) + ' to ' + fmt1(h.hi) + ')');
     });
   })();
 

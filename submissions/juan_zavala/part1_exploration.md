@@ -1,4 +1,4 @@
-# Part 1: Getting Started with the New Data (Discussion Before Code)
+# Part 1: Getting Started with the New Data (Discussion Before Modeling)
 
 **Data:** `data/season_stats.csv` holds 272 games. Each row is one team's game, with columns `week`, `name` (team), `opp_name`, `tm_score`, `opp_score`, `rush_yds` and `pass_yds`, plus a leading unnamed ID column (12 to 283). `actual.csv` is the answer key and is kept for Part 7.
 
@@ -30,7 +30,7 @@ Yes, but only in one column.
 Two more facts about the file matter for every method:
 
 - **Every row is the winning team.** `tm_score` is higher than `opp_score` in all 272 rows, with no ties. The file is one row per game, from the winner's side. The 16 missing games are wins too, so a team's average from its other wins is a like-for-like comparison.
-- **Each team has a different number of rows**, from 2 games (Panthers) to 13 (Ravens). The 16 teams missing a week-12 value have between 5 and 12 known games each, so every one of them has a team average available.
+- **Teams have different numbers of rows**, from 2 games (Panthers) to 13 (Ravens). The 16 teams missing a week-12 value have between 5 and 12 known games each, so every one of them has a team average available.
 
 ## Are the week-12 games unusual in other ways?
 
@@ -45,7 +45,7 @@ No. On every other column, week 12 looks like the rest of the season:
 
 Rushing yards also don't trend across the season. The Spearman correlation between week and `rush_yds` is +0.025 (p = 0.69), and a Kruskal-Wallis test across weeks gives p = 0.12.
 
-**What kind of missingness is this?** It depends only on the week, and the week is unrelated to rushing yards and to the other columns. So filling week 12 from the other 17 weeks shouldn't push the estimates up or down. One limit to be honest about: without the true values, we can't fully rule out that something about week 12's rushing *itself* caused the gap. Part 8 checks this against the answer key.
+**What kind of missingness is this?** It depends only on the week, and the week shows no detectable relationship with rushing yards or the other columns. So filling week 12 from the other 17 weeks shouldn't push the estimates up or down. One limit to be honest about: without the true values, we can't fully rule out that something about week 12's rushing *itself* caused the gap. Part 8 checks this against the answer key.
 
 ## What could help predict the missing values?
 
@@ -72,7 +72,7 @@ These are modest relationships, so no method will predict rushing yards closely.
 
 ---
 
-## The plan (agreed before writing code)
+## The plan (agreed before any modeling code)
 
 | Part | Method | How it fills the 16 nulls | Expected strength | Expected weakness |
 |---|---|---|---|---|
