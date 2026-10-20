@@ -1,0 +1,4 @@
+dataframe,method,expected MAE,expected MSE,expected rank (MAE),expected rank (MSE)
+stats2,Overall mean,37.62,2391.29,2,2
+stats3,Team mean,39.79,2502.01,3,3
+stats4,Ridge regression,34.09,1932.22,1,1
